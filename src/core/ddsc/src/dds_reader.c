@@ -108,8 +108,8 @@ static dds_return_t dds_reader_status_validate (uint32_t mask)
   return (mask & ~DDS_READER_STATUS_MASK) ? DDS_RETCODE_BAD_PARAMETER : DDS_RETCODE_OK;
 }
 
-void dds_reader_data_available_cb (struct dds_reader *rd)
-{
+void dds_reader_data_available_cb(struct dds_reader *rd,
+                                  struct ddsi_serdata *sample) {
   /* DATA_AVAILABLE is special in two ways: firstly, it should first try
      DATA_ON_READERS on the line of ancestors, and if not consumed set the
      status on the subscriber; secondly it is the only one for which
@@ -117,7 +117,8 @@ void dds_reader_data_available_cb (struct dds_reader *rd)
      dds_reader_status_cb. */
 
   const uint32_t data_av_enabled = (ddsrt_atomic_ld32 (&rd->m_entity.m_status.m_status_and_mask) & (DDS_DATA_AVAILABLE_STATUS << SAM_ENABLED_SHIFT));
-  if (data_av_enabled == 0)
+  // force enabled to execute on_data_available
+  if (false && data_av_enabled == 0)
     return;
 
   ddsrt_mutex_lock (&rd->m_entity.m_observers_lock);
@@ -156,6 +157,9 @@ void dds_reader_data_available_cb (struct dds_reader *rd)
   else if (rd->m_entity.m_listener.on_data_available)
   {
     ddsrt_mutex_unlock (&rd->m_entity.m_observers_lock);
+
+    sample->reception_timestamp.v = dds_time();
+
     lst->on_data_available (rd->m_entity.m_hdllink.hdl, lst->on_data_available_arg);
     ddsrt_mutex_lock (&rd->m_entity.m_observers_lock);
   }
